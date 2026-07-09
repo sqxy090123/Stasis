@@ -3,6 +3,7 @@
 
 void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, COLORREF color2)
 {
+    DebugLog(L"DrawGradientProgressBar: value=%.1f", value);
     if (value < 0.0) value = 0.0;
     if (value > 100.0) value = 100.0;
     int width = rc.right - rc.left;

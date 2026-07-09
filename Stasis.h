@@ -87,6 +87,8 @@ typedef struct {
 
 // 全局状态 extern 声明（定义在 app_window.c）
 extern AppState g_State;
+extern BOOL g_DebugMode;
+void DebugLog(const WCHAR* format, ...);
 
 // 模块函数声明
 

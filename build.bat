@@ -1,4 +1,5 @@
 @echo off
+
 :: Stasis 编译脚本 - 使用 MSVC 工具链
 :: 需要从 Visual Studio 开发者命令提示符运行
 
@@ -17,3 +18,4 @@ if %ERRORLEVEL% EQU 0 (
     echo 编译失败，请检查代码。
 )
 pause
+del *.lib *.obj

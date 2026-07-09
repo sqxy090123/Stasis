@@ -85,3 +85,27 @@ void LogEvent(const WCHAR* format, ...)
     }
     LeaveCriticalSection(&g_LogCs);
 }
+void DebugLog(const WCHAR* format, ...)
+{
+    if (!g_DebugMode) return;
+    EnterCriticalSection(&g_LogCs);
+    if (!g_LogFile)
+    {
+        LeaveCriticalSection(&g_LogCs);
+        return;
+    }
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    fwprintf(g_LogFile, L"[%04d-%02d-%02d %02d:%02d:%02d.%03d] DEBUG: ",
+        st.wYear, st.wMonth, st.wDay,
+        st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    va_list args;
+    va_start(args, format);
+    vfwprintf(g_LogFile, format, args);
+    va_end(args);
+    fwprintf(g_LogFile, L"\n");
+    fflush(g_LogFile);
+    LeaveCriticalSection(&g_LogCs);
+}

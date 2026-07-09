@@ -1,8 +1,13 @@
 // main.c - 程序入口
 #include "Stasis.h"
 
+BOOL g_DebugMode = FALSE;
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
+    if (wcsstr(pCmdLine, L"--debug"))
+        g_DebugMode = TRUE;
+
     // 单实例检查
     HANDLE hMutex = CreateMutexW(NULL, FALSE, L"Stasis_SingleInstance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS || GetLastError() == ERROR_ACCESS_DENIED)

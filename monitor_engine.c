@@ -39,6 +39,7 @@ static int CompareProcCpu(const void* a, const void* b)
 
 void FreezeHighCpuProcesses(void)
 {
+    DebugLog(L"FreezeHighCpuProcesses called");
     double totalCpu = GetTotalCpuUsage();
     double totalMem = GetTotalMemUsage();
     if (totalCpu < g_State.cpuThreshold && totalMem < g_State.memThreshold) return;

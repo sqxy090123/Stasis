@@ -1,2 +1,5 @@
 .env
 .vscode/*
+*.exe
+*.obj
+*.res
