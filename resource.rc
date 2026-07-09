@@ -1,0 +1,7 @@
+#include <windows.h>
+
+// 图标 (请提供 stasis.ico 文件)
+APP_ICON ICON "stasis.ico"
+
+// 管理员权限清单
+1 24 "manifest.xml"

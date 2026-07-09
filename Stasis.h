@@ -46,7 +46,7 @@ extern const WCHAR* SystemWhitelist[SYSTEM_WHITELIST_COUNT];
 #define MONITOR_INTERVAL 500
 // 看门狗超时（ms）
 #define WATCHDOG_TIMEOUT 5000
-// NtSuspendProcess 超时
+// NtSuspendProcess 超时（简化处理，不使用）
 #define SUSPEND_TIMEOUT_MS 3000
 
 // 进程状态图标字符
@@ -104,7 +104,6 @@ extern pNtResumeProcess NtResumeProcess;
 BOOL InitProcessAPI(void);
 BOOL SuspendProcessByPid(DWORD pid);
 BOOL ResumeProcessByPid(DWORD pid);
-DWORD GetProcessCpuUsage(HANDLE hProcess, ULONGLONG* prevKernel, ULONGLONG* prevUser);
 BOOL EnumProcessesEx(DWORD* pids, int maxCount, int* outCount);
 BOOL GetProcessMemoryKB(DWORD pid, SIZE_T* memKB);
 BOOL IsCriticalProcess(const WCHAR* name);
@@ -117,6 +116,8 @@ DWORD WINAPI MonitorThread(LPVOID param);
 void FreezeHighCpuProcesses(void);
 void ThawProcessesIfNeeded(void);
 void ForceThawAll(void);
+double GetTotalCpuUsage(void);
+double GetTotalMemUsage(void);
 
 // ui_controls.c
 void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, COLORREF color2);
@@ -125,6 +126,7 @@ void DrawToggleSwitch(HDC hdc, RECT rc, BOOL state);
 void DrawSlider(HDC hdc, RECT rc, int min, int max, int value);
 void InitCustomControls(void);
 void PaintCustomUI(HWND hwnd, HDC hdc);
+LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // tray_icon.c
 void CreateTrayIcon(HWND hwnd);
@@ -139,7 +141,7 @@ BOOL SetAutoStart(BOOL enable);
 BOOL IsAutoStartEnabled(void);
 void ApplySettingsToUI(void);
 
-// 日志记录
+// log.c
 void LogEvent(const WCHAR* format, ...);
 void InitLog(void);
 void CloseLog(void);

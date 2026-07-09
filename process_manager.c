@@ -42,7 +42,7 @@ BOOL SuspendProcessByPid(DWORD pid)
 {
     HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
     if (!hProcess) return FALSE;
-    // 超时保护：简单方式使用线程同步，这里忽略，直接调用
+    // 简单同步调用，无超时保护（可扩展）
     BOOL ret = NtSuspendProcess(hProcess);
     CloseHandle(hProcess);
     if (ret) LogEvent(L"Frozen PID %lu", pid);
@@ -83,7 +83,7 @@ BOOL IsCriticalProcess(const WCHAR* name)
 {
     for (int i = 0; i < SYSTEM_WHITELIST_COUNT; i++)
         if (_wcsicmp(name, SystemWhitelist[i]) == 0) return TRUE;
-    return IsProcessInUserWhitelist(name);
+    return FALSE; // 注意：用户白名单在逻辑上应单独判断，此处仅检查系统关键进程
 }
 
 BOOL IsProcessInUserWhitelist(const WCHAR* name)
