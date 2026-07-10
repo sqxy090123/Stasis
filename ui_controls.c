@@ -1,6 +1,25 @@
 // ui_controls.c - 自绘控件实现
 #include "Stasis.h"
 
+void DrawRoundedButton(HDC hdc, RECT rc, const WCHAR* text, BOOL hover, BOOL pressed) {
+    COLORREF bg = pressed ? RGB(80,80,80) : hover ? RGB(100,100,100) : RGB(70,70,70);
+    HBRUSH hBr = CreateSolidBrush(bg);
+    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(150,150,150));
+    HBRUSH oldBr = SelectObject(hdc, hBr);
+    HPEN oldPen = SelectObject(hdc, hPen);
+    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 8, 8);
+    SelectObject(hdc, oldBr); SelectObject(hdc, oldPen);
+    DeleteObject(hBr); DeleteObject(hPen);
+
+    // 文字
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, RGB(220,220,220));
+    // 设置按钮字体（与创建时一致）
+    HFONT oldFont = SelectObject(hdc, g_hBtnFont);
+    DrawTextW(hdc, text, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    SelectObject(hdc, oldFont);
+}
+
 void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, COLORREF color2)
 {
     DebugLog(L"DrawGradientProgressBar: value=%.1f", value);
@@ -42,23 +61,6 @@ void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, CO
     DeleteObject(hPen);
 }
 
-void DrawRoundedButton(HDC hdc, RECT rc, const WCHAR* text, BOOL hover, BOOL pressed)
-{
-    COLORREF bgColor = pressed ? RGB(80, 80, 80) : hover ? RGB(100, 100, 100) : RGB(70, 70, 70);
-    HBRUSH hBrush = CreateSolidBrush(bgColor);
-    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(150, 150, 150));
-    HBRUSH oldBr = SelectObject(hdc, hBrush);
-    HPEN oldPen = SelectObject(hdc, hPen);
-    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 8, 8);
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBrush);
-    DeleteObject(hPen);
-
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(220, 220, 220));
-    DrawTextW(hdc, text, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-}
 
 void DrawToggleSwitch(HDC hdc, RECT rc, BOOL state)
 {

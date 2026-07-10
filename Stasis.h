@@ -148,4 +148,6 @@ void LogEvent(const WCHAR* format, ...);
 void InitLog(void);
 void CloseLog(void);
 
+
+extern HFONT g_hBtnFont;
 #endif
