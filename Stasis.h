@@ -150,4 +150,5 @@ void CloseLog(void);
 
 
 extern HFONT g_hBtnFont;
+extern HFONT g_hStatusFont;
 #endif

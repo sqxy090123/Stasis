@@ -1,5 +1,7 @@
 // ui_controls.c - 自绘控件实现
 #include "Stasis.h"
+#include <msimg32.h>
+#pragma comment(lib, "msimg32.lib")
 
 void DrawRoundedButton(HDC hdc, RECT rc, const WCHAR* text, BOOL hover, BOOL pressed) {
     COLORREF bg = pressed ? RGB(80,80,80) : hover ? RGB(100,100,100) : RGB(70,70,70);
@@ -22,35 +24,33 @@ void DrawRoundedButton(HDC hdc, RECT rc, const WCHAR* text, BOOL hover, BOOL pre
 
 void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, COLORREF color2)
 {
-    DebugLog(L"DrawGradientProgressBar: value=%.1f", value);
     if (value < 0.0) value = 0.0;
     if (value > 100.0) value = 100.0;
     int width = rc.right - rc.left;
     int fill = (int)(width * value / 100.0);
 
-    // 背景
     HBRUSH hBack = CreateSolidBrush(RGB(60, 60, 60));
     FillRect(hdc, &rc, hBack);
     DeleteObject(hBack);
 
-    // 渐变填充
     if (fill > 0)
     {
-        for (int x = 0; x < fill; x++)
-        {
-            double ratio = (double)x / fill;
-            int r = (int)(GetRValue(color1) * (1 - ratio) + GetRValue(color2) * ratio);
-            int g = (int)(GetGValue(color1) * (1 - ratio) + GetGValue(color2) * ratio);
-            int b = (int)(GetBValue(color1) * (1 - ratio) + GetBValue(color2) * ratio);
-            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(r, g, b));
-            HPEN oldPen = SelectObject(hdc, hPen);
-            MoveToEx(hdc, rc.left + x, rc.top, NULL);
-            LineTo(hdc, rc.left + x, rc.bottom);
-            SelectObject(hdc, oldPen);
-            DeleteObject(hPen);
-        }
+        TRIVERTEX vert[2];
+        vert[0].x = rc.left;        vert[0].y = rc.top;
+        vert[0].Red   = GetRValue(color1) << 8;
+        vert[0].Green = GetGValue(color1) << 8;
+        vert[0].Blue  = GetBValue(color1) << 8;
+        vert[0].Alpha = 0x0000;
+        vert[1].x = rc.left + fill;  vert[1].y = rc.bottom;
+        vert[1].Red   = GetRValue(color2) << 8;
+        vert[1].Green = GetGValue(color2) << 8;
+        vert[1].Blue  = GetBValue(color2) << 8;
+        vert[1].Alpha = 0x0000;
+
+        GRADIENT_RECT gRect = { 0, 1 };
+        GradientFill(hdc, vert, 2, &gRect, 1, GRADIENT_FILL_RECT_H);
     }
-    // 边框
+
     HPEN hPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));
     HBRUSH nullBr = (HBRUSH)GetStockObject(NULL_BRUSH);
     HPEN oldPen = SelectObject(hdc, hPen);

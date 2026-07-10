@@ -152,25 +152,34 @@ DWORD WINAPI MonitorThread(LPVOID param)
             ThawProcessesIfNeeded();
         }
 
-        HWND hFg = GetForegroundWindow();
-        DWORD fgPid;
-        GetWindowThreadProcessId(hFg, &fgPid);
+        BOOL hasFrozen;
         EnterCriticalSection(&g_State.cs);
-        for (int i = 0; i < g_State.frozenCount; i++)
-        {
-            if (g_State.frozenStack[i] == fgPid)
-            {
-                DWORD wakePid = fgPid;
-                memmove(&g_State.frozenStack[i], &g_State.frozenStack[i+1],
-                    (g_State.frozenCount - i - 1) * sizeof(DWORD));
-                g_State.frozenCount--;
-                LeaveCriticalSection(&g_State.cs);
-                ResumeProcessByPid(wakePid);
-                EnterCriticalSection(&g_State.cs);
-                break;
-            }
-        }
+        hasFrozen = (g_State.frozenCount > 0);
         LeaveCriticalSection(&g_State.cs);
+
+        if (hasFrozen)
+        {
+            HWND hFg = GetForegroundWindow();
+            DWORD fgPid;
+            GetWindowThreadProcessId(hFg, &fgPid);
+            EnterCriticalSection(&g_State.cs);
+            for (int i = 0; i < g_State.frozenCount; i++)
+            {
+                if (g_State.frozenStack[i] == fgPid)
+                {
+                    DWORD wakePid = fgPid;
+                    memmove(&g_State.frozenStack[i], &g_State.frozenStack[i+1],
+                        (g_State.frozenCount - i - 1) * sizeof(DWORD));
+                    g_State.frozenCount--;
+                    LeaveCriticalSection(&g_State.cs);
+                    ResumeProcessByPid(wakePid);
+                    EnterCriticalSection(&g_State.cs);
+                    break;
+                }
+            }
+            LeaveCriticalSection(&g_State.cs);
+        }
+
         Sleep(MONITOR_INTERVAL);
     }
     return 0;

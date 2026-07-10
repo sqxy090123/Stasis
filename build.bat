@@ -4,7 +4,7 @@
 :: 需要从 Visual Studio 开发者命令提示符运行
 
 set CL_FLAGS=/MT /O2 /GL /GS- /W4 /utf-8 /D UNICODE /D _UNICODE /D _CRT_SECURE_NO_WARNINGS
-set LINK_FLAGS=/link user32.lib kernel32.lib gdi32.lib shell32.lib advapi32.lib psapi.lib comctl32.lib /SUBSYSTEM:WINDOWS /OUT:Stasis.exe
+set LINK_FLAGS=/link user32.lib kernel32.lib gdi32.lib shell32.lib advapi32.lib psapi.lib comctl32.lib msimg32.lib /SUBSYSTEM:WINDOWS /OUT:Stasis.exe
 
 :: 1. 编译资源文件
 rc resource.rc

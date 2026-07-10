@@ -27,14 +27,39 @@ static void EnableAcrylic(HWND hwnd) {
 static HFONT g_hTitleFont = NULL;
 static HFONT g_hBtnFont = NULL;
 static HFONT g_hListFont = NULL;
+static HFONT g_hStatusFont = NULL;
 
 // DPI缩放因子
 static float g_dpiScale = 1.0f;
 
-static int GetWindowDpi(HWND hwnd) {
+static void RebuildFonts(void) {
+    if (g_hTitleFont) DeleteObject(g_hTitleFont);
+    if (g_hBtnFont) DeleteObject(g_hBtnFont);
+    if (g_hListFont) DeleteObject(g_hListFont);
+    if (g_hStatusFont) DeleteObject(g_hStatusFont);
+    int titleFontSize = (int)(16 * g_dpiScale);
+    int btnFontSize = (int)(13 * g_dpiScale);
+    int listFontSize = (int)(14 * g_dpiScale);
+    int statusFontSize = (int)(15 * g_dpiScale);
+    g_hTitleFont = CreateFontW(-titleFontSize, 0,0,0, FW_SEMIBOLD, FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
+    g_hBtnFont = CreateFontW(-btnFontSize, 0,0,0, FW_NORMAL, FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
+    g_hListFont = CreateFontW(-listFontSize, 0,0,0, FW_NORMAL, FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
+    g_hStatusFont = CreateFontW(-statusFontSize, 0,0,0, FW_NORMAL, FALSE,FALSE,FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
+}
+
+static void UpdateDpiScale(HWND hwnd) {
     UINT dpi = GetDpiForWindow(hwnd);
-    if (dpi == 0) { HDC hdc = GetDC(hwnd); dpi = GetDeviceCaps(hdc, LOGPIXELSY); ReleaseDC(hwnd, hdc); }
-    return dpi;
+    if (dpi == 0) dpi = 96;
+    g_dpiScale = dpi / 96.0f;
+    RebuildFonts();
 }
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -45,9 +70,13 @@ HWND CreateMainWindow(HINSTANCE hInstance) {
         NULL, L"StasisMainWindowClass" };
     RegisterClassExW(&wc);
 
-    // 获取DPI缩放
-    int dpi = GetDpiForWindow(NULL);
-    if (dpi == 0) dpi = 96;
+    // 获取DPI缩放 - 使用 GetDpiForSystem 替代不可靠的 GetDpiForWindow(NULL)
+    UINT dpi = GetDpiForSystem();
+    if (dpi == 0) {
+        HDC hdcScreen = GetDC(NULL);
+        dpi = GetDeviceCaps(hdcScreen, LOGPIXELSY);
+        ReleaseDC(NULL, hdcScreen);
+    }
     g_dpiScale = dpi / 96.0f;
 
     int winW = (int)(700 * g_dpiScale);
@@ -58,19 +87,7 @@ HWND CreateMainWindow(HINSTANCE hInstance) {
         NULL, NULL, hInstance, NULL);
     if (hwnd) {
         EnableAcrylic(hwnd);
-        // 创建字体
-        int titleFontSize = (int)(16 * g_dpiScale);
-        int btnFontSize = (int)(13 * g_dpiScale);
-        int listFontSize = (int)(14 * g_dpiScale);
-        g_hTitleFont = CreateFontW(titleFontSize, 0,0,0, FW_SEMIBOLD, FALSE,FALSE,FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
-        g_hBtnFont = CreateFontW(btnFontSize, 0,0,0, FW_NORMAL, FALSE,FALSE,FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
-        g_hListFont = CreateFontW(listFontSize, 0,0,0, FW_NORMAL, FALSE,FALSE,FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
+        RebuildFonts();
 
         ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
@@ -168,8 +185,24 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     }
     case WM_TIMER:
         if (wParam == 500) {
-            RefreshListView();
-            InvalidateRect(hwnd, NULL, FALSE);
+            static double lastCpu = -1.0, lastMem = -1.0;
+            static int lastFrozen = -1;
+            double cpu = GetTotalCpuUsage();
+            double mem = GetTotalMemUsage();
+            int frozen = 0;
+            EnterCriticalSection(&g_State.cs);
+            frozen = g_State.frozenCount;
+            LeaveCriticalSection(&g_State.cs);
+            int cpuI = (int)cpu, memI = (int)mem;
+            int lastCpuI = (int)lastCpu, lastMemI = (int)lastMem;
+            if (cpuI != lastCpuI || memI != lastMemI || frozen != lastFrozen) {
+                lastCpu = cpu; lastMem = mem;
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            if (frozen != lastFrozen) {
+                lastFrozen = frozen;
+                RefreshListView();
+            }
         }
         break;
     case WM_PAINT: {
@@ -199,10 +232,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         frozen = g_State.frozenCount;
         LeaveCriticalSection(&g_State.cs);
 
-        HFONT hFont = CreateFontW((int)(15*g_dpiScale),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH|FF_DONTCARE, L"Segoe UI");
-        HFONT oldF = SelectObject(hdc, hFont);
+        HFONT oldF = SelectObject(hdc, g_hStatusFont);
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(230,230,230));
 
@@ -222,11 +252,20 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         DrawTextW(hdc, text, -1, &rcFz, DT_CENTER|DT_VCENTER|DT_SINGLELINE);
 
         SelectObject(hdc, oldF);
-        DeleteObject(hFont);
         EndPaint(hwnd, &ps);
         break;
     }
     case WM_ERASEBKGND: return TRUE;
+    case WM_DPICHANGED: {
+        UpdateDpiScale(hwnd);
+        RECT* rcNew = (RECT*)lParam;
+        SetWindowPos(hwnd, NULL,
+            rcNew->left, rcNew->top,
+            rcNew->right - rcNew->left, rcNew->bottom - rcNew->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        InvalidateRect(hwnd, NULL, TRUE);
+        break;
+    }
     case WM_LBUTTONDOWN: {
         POINT pt = { LOWORD(lParam), HIWORD(lParam) };
         if (pt.y < (int)(35*g_dpiScale)) {
@@ -288,6 +327,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         DeleteObject(g_hTitleFont);
         DeleteObject(g_hBtnFont);
         DeleteObject(g_hListFont);
+        DeleteObject(g_hStatusFont);
         PostQuitMessage(0);
         break;
     default: return DefWindowProcW(hwnd, msg, wParam, lParam);
