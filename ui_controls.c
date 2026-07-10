@@ -1,7 +1,10 @@
 // ui_controls.c - 自绘控件实现
 #include "Stasis.h"
-#include <msimg32.h>
 #pragma comment(lib, "msimg32.lib")
+
+typedef struct _GRADIENT_RECT { ULONG UpperLeft; ULONG LowerRight; } GRADIENT_RECT, *PGRADIENT_RECT;
+typedef BOOL (WINAPI* GradientFill_t)(HDC, PTRIVERTEX, ULONG, PVOID, ULONG, ULONG);
+#define GRADIENT_FILL_RECT_H 0x00000000
 
 void DrawRoundedButton(HDC hdc, RECT rc, const WCHAR* text, BOOL hover, BOOL pressed) {
     COLORREF bg = pressed ? RGB(80,80,80) : hover ? RGB(100,100,100) : RGB(70,70,70);
@@ -35,20 +38,29 @@ void DrawGradientProgressBar(HDC hdc, RECT rc, double value, COLORREF color1, CO
 
     if (fill > 0)
     {
-        TRIVERTEX vert[2];
-        vert[0].x = rc.left;        vert[0].y = rc.top;
-        vert[0].Red   = GetRValue(color1) << 8;
-        vert[0].Green = GetGValue(color1) << 8;
-        vert[0].Blue  = GetBValue(color1) << 8;
-        vert[0].Alpha = 0x0000;
-        vert[1].x = rc.left + fill;  vert[1].y = rc.bottom;
-        vert[1].Red   = GetRValue(color2) << 8;
-        vert[1].Green = GetGValue(color2) << 8;
-        vert[1].Blue  = GetBValue(color2) << 8;
-        vert[1].Alpha = 0x0000;
+        static GradientFill_t pGradientFill = NULL;
+        if (!pGradientFill) {
+            HMODULE hMsimg32 = LoadLibraryW(L"msimg32.dll");
+            if (hMsimg32)
+                pGradientFill = (GradientFill_t)GetProcAddress(hMsimg32, "GradientFill");
+        }
+        if (pGradientFill)
+        {
+            TRIVERTEX vert[2];
+            vert[0].x = rc.left;        vert[0].y = rc.top;
+            vert[0].Red   = GetRValue(color1) << 8;
+            vert[0].Green = GetGValue(color1) << 8;
+            vert[0].Blue  = GetBValue(color1) << 8;
+            vert[0].Alpha = 0x0000;
+            vert[1].x = rc.left + fill;  vert[1].y = rc.bottom;
+            vert[1].Red   = GetRValue(color2) << 8;
+            vert[1].Green = GetGValue(color2) << 8;
+            vert[1].Blue  = GetBValue(color2) << 8;
+            vert[1].Alpha = 0x0000;
 
-        GRADIENT_RECT gRect = { 0, 1 };
-        GradientFill(hdc, vert, 2, &gRect, 1, GRADIENT_FILL_RECT_H);
+            GRADIENT_RECT gRect = { 0, 1 };
+            pGradientFill(hdc, vert, 2, &gRect, 1, GRADIENT_FILL_RECT_H);
+        }
     }
 
     HPEN hPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));

@@ -25,9 +25,9 @@ static void EnableAcrylic(HWND hwnd) {
 }
 
 static HFONT g_hTitleFont = NULL;
-static HFONT g_hBtnFont = NULL;
+HFONT g_hBtnFont = NULL;
 static HFONT g_hListFont = NULL;
-static HFONT g_hStatusFont = NULL;
+HFONT g_hStatusFont = NULL;
 
 // DPI缩放因子
 static float g_dpiScale = 1.0f;
@@ -319,7 +319,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         g_State.trayVisible = TRUE;
         SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
         NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW), hwnd, 1, NIF_INFO };
-        wcscpy_s(nid.szInfo, L"Stasis 已驻留后台");
+        wcscpy_s(nid.szInfo, _countof(nid.szInfo), L"Stasis 已驻留后台");
         Shell_NotifyIconW(NIM_MODIFY, &nid);
         return 0;
     case WM_DESTROY:
