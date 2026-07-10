@@ -128,7 +128,7 @@ void DrawToggleSwitch(HDC hdc, RECT rc, BOOL state);
 void DrawSlider(HDC hdc, RECT rc, int min, int max, int value);
 void InitCustomControls(void);
 void PaintCustomUI(HWND hwnd, HDC hdc);
-LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
 // tray_icon.c
 void CreateTrayIcon(HWND hwnd);

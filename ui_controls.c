@@ -2,7 +2,6 @@
 #include "Stasis.h"
 #pragma comment(lib, "msimg32.lib")
 
-typedef struct _GRADIENT_RECT { ULONG UpperLeft; ULONG LowerRight; } GRADIENT_RECT, *PGRADIENT_RECT;
 typedef BOOL (WINAPI* GradientFill_t)(HDC, PTRIVERTEX, ULONG, PVOID, ULONG, ULONG);
 #define GRADIENT_FILL_RECT_H 0x00000000
 
@@ -134,7 +133,7 @@ void PaintCustomUI(HWND hwnd, HDC hdc)
 }
 
 // 滑块子类化过程
-LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
     WNDPROC oldProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_USERDATA);
     switch (msg)

@@ -97,6 +97,7 @@ HWND CreateMainWindow(HINSTANCE hInstance) {
 
 // 标题栏绘制
 static void DrawTitleBar(HDC hdc, HWND hwnd) {
+    (void)hwnd;
     RECT rc = {0,0, (int)(700*g_dpiScale), (int)(35*g_dpiScale) };
     HBRUSH hBr = CreateSolidBrush(RGB(20,20,30));
     FillRect(hdc, &rc, hBr);
