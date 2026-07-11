@@ -3,3 +3,5 @@
 *.exe
 *.obj
 *.res.vscode/
+extracted_defects/
+.monkeycode-tmp-files/
