@@ -6,7 +6,8 @@ pNtResumeProcess NtResumeProcess = NULL;
 
 const WCHAR* SystemWhitelist[] = {
     L"System", L"Idle", L"csrss.exe", L"winlogon.exe",
-    L"services.exe", L"lsass.exe", L"svchost.exe"
+    L"services.exe", L"lsass.exe", L"svchost.exe",
+    L"explorer.exe", L"dwm.exe", L"taskmgr.exe"
 };
 
 BOOL InitProcessAPI(void)
@@ -105,4 +106,9 @@ BOOL IsProcessForeground(DWORD pid)
     DWORD fgPid;
     GetWindowThreadProcessId(hFg, &fgPid);
     return (fgPid == pid);
+}
+
+BOOL IsCurrentProcess(DWORD pid)
+{
+    return pid == GetCurrentProcessId();
 }

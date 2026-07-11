@@ -37,7 +37,7 @@
 #define DEFAULT_THAW_THRESHOLD      60
 
 // 白名单系统进程
-#define SYSTEM_WHITELIST_COUNT 7
+#define SYSTEM_WHITELIST_COUNT 10
 extern const WCHAR* SystemWhitelist[SYSTEM_WHITELIST_COUNT];
 
 // 日志行数
@@ -112,6 +112,7 @@ BOOL IsCriticalProcess(const WCHAR* name);
 BOOL IsProcessInUserWhitelist(const WCHAR* name);
 BOOL IsProcessForeground(DWORD pid);
 BOOL EnableDebugPrivilege(void);
+BOOL IsCurrentProcess(DWORD pid);
 
 // monitor_engine.c
 DWORD WINAPI MonitorThread(LPVOID param);

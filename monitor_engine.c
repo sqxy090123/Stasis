@@ -71,6 +71,7 @@ void FreezeHighCpuProcesses(void)
 
         if (IsCriticalProcess(name) || IsProcessForeground(pid)) continue;
         if (IsProcessInUserWhitelist(name)) continue;
+        if (IsCurrentProcess(pid)) continue;
 
         procs[valid].pid = pid;
         procs[valid].cpu = 5.0; // 简化占位
@@ -78,7 +79,10 @@ void FreezeHighCpuProcesses(void)
     }
     qsort(procs, valid, sizeof(ProcCpu), CompareProcCpu);
 
-    for (int i = 0; i < valid; i++)
+    int maxFreezeThisRound = 5;
+    int frozenThisRound = 0;
+
+    for (int i = 0; i < valid && frozenThisRound < maxFreezeThisRound; i++)
     {
         double curCpu = GetTotalCpuUsage();
         double curMem = GetTotalMemUsage();
@@ -89,6 +93,7 @@ void FreezeHighCpuProcesses(void)
         if (g_State.frozenCount < 1024)
             g_State.frozenStack[g_State.frozenCount++] = procs[i].pid;
         LeaveCriticalSection(&g_State.cs);
+        frozenThisRound++;
         Sleep(100);
     }
     free(procs);
