@@ -2,4 +2,4 @@
 .vscode/*
 *.exe
 *.obj
-*.res
+*.res.vscode/
