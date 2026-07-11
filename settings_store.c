@@ -25,9 +25,20 @@ void LoadSettings(void)
             if (*token)
             {
                 EnterCriticalSection(&g_State.cs);
-                g_State.userWhitelist = realloc(g_State.userWhitelist, (g_State.whitelistCount + 1) * sizeof(WCHAR*));
+                WCHAR** newList = realloc(g_State.userWhitelist, (g_State.whitelistCount + 1) * sizeof(WCHAR*));
+                if (!newList)
+                {
+                    LeaveCriticalSection(&g_State.cs);
+                    break;
+                }
+                g_State.userWhitelist = newList;
                 size_t len = wcslen(token) + 1;
                 g_State.userWhitelist[g_State.whitelistCount] = malloc(len * sizeof(WCHAR));
+                if (!g_State.userWhitelist[g_State.whitelistCount])
+                {
+                    LeaveCriticalSection(&g_State.cs);
+                    break;
+                }
                 wcscpy_s(g_State.userWhitelist[g_State.whitelistCount], len, token);
                 g_State.whitelistCount++;
                 LeaveCriticalSection(&g_State.cs);

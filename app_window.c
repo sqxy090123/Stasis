@@ -205,6 +205,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 RefreshListView();
             }
         }
+        else if (wParam == WM_WATCHDOG_TIMER) {
+            InterlockedIncrement(&g_State.watchdogCounter);
+        }
         break;
     case WM_PAINT: {
         PAINTSTRUCT ps;
@@ -306,6 +309,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             break;
         }
         break;
+    case WM_WATCHDOG_ALERT:
+        MessageBoxW(hwnd, L"检测到UI无响应，已强制解冻所有进程！", L"Stasis 看门狗", MB_ICONWARNING);
+        break;
     case WM_TRAYICON:
         if (lParam == WM_RBUTTONUP) ShowTrayMenu(hwnd);
         else if (lParam == WM_LBUTTONDBLCLK) {
@@ -324,6 +330,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         Shell_NotifyIconW(NIM_MODIFY, &nid);
         return 0;
     case WM_DESTROY:
+        KillTimer(hwnd, WM_WATCHDOG_TIMER);
         KillTimer(hwnd, 500);
         DeleteObject(g_hTitleFont);
         DeleteObject(g_hBtnFont);

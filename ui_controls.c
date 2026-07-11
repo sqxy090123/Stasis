@@ -150,13 +150,17 @@ LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         else if (id == IDC_SLIDER_THAW) { min = 30; max = 80; pVal = &g_State.thawThreshold; }
         if (pVal)
         {
-            double ratio = (double)pt.x / (rc.right - rc.left);
-            *pVal = min + (int)(ratio * (max - min + 1));
-            if (*pVal < min) *pVal = min;
-            if (*pVal > max) *pVal = max;
-            *pVal = ((*pVal - min) / 5) * 5 + min;
-            InvalidateRect(hwnd, NULL, TRUE);
-            SaveSettings();
+            int width = rc.right - rc.left;
+            if (width > 0)
+            {
+                double ratio = (double)pt.x / width;
+                *pVal = min + (int)(ratio * (max - min + 1));
+                if (*pVal < min) *pVal = min;
+                if (*pVal > max) *pVal = max;
+                *pVal = ((*pVal - min) / 5) * 5 + min;
+                InvalidateRect(hwnd, NULL, TRUE);
+                SaveSettings();
+            }
         }
         return 0;
     }
@@ -172,12 +176,16 @@ LRESULT CALLBACK SliderSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             else if (id == IDC_SLIDER_THAW) { min = 30; max = 80; pVal = &g_State.thawThreshold; }
             if (pVal)
             {
-                double ratio = (double)pt.x / (rc.right - rc.left);
-                *pVal = min + (int)(ratio * (max - min + 1));
-                if (*pVal < min) *pVal = min;
-                if (*pVal > max) *pVal = max;
-                *pVal = ((*pVal - min) / 5) * 5 + min;
-                InvalidateRect(hwnd, NULL, TRUE);
+                int width = rc.right - rc.left;
+                if (width > 0)
+                {
+                    double ratio = (double)pt.x / width;
+                    *pVal = min + (int)(ratio * (max - min + 1));
+                    if (*pVal < min) *pVal = min;
+                    if (*pVal > max) *pVal = max;
+                    *pVal = ((*pVal - min) / 5) * 5 + min;
+                    InvalidateRect(hwnd, NULL, TRUE);
+                }
             }
         }
         break;

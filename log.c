@@ -59,29 +59,36 @@ void LogEvent(const WCHAR* format, ...)
             WCHAR* lines[1000] = {0};
             int lineCount = 0;
             WCHAR buf[512];
+            BOOL allocFailed = FALSE;
             while (fgetws(buf, 512, fSrc) && lineCount < 1000)
             {
                 size_t len = wcslen(buf);
                 lines[lineCount] = (WCHAR*)malloc((len + 1) * sizeof(WCHAR));
-                if (lines[lineCount])
+                if (!lines[lineCount])
                 {
-                    wcscpy_s(lines[lineCount], len + 1, buf);
-                    lineCount++;
+                    allocFailed = TRUE;
+                    break;
                 }
+                wcscpy_s(lines[lineCount], len + 1, buf);
+                lineCount++;
             }
             fclose(fSrc);
 
-            g_LogFile = _wfopen(LOG_FILE, L"w, ccs=UNICODE");
-            if (g_LogFile)
+            if (!allocFailed)
             {
-                int start = lineCount > LOG_MAX_LINES ? lineCount - LOG_MAX_LINES : 0;
-                for (int i = start; i < lineCount; i++)
-                    fputws(lines[i], g_LogFile);
-                for (int i = 0; i < lineCount; i++) free(lines[i]);
+                g_LogFile = _wfopen(LOG_FILE, L"w, ccs=UNICODE");
+                if (g_LogFile)
+                {
+                    int start = lineCount > LOG_MAX_LINES ? lineCount - LOG_MAX_LINES : 0;
+                    for (int i = start; i < lineCount; i++)
+                        fputws(lines[i], g_LogFile);
+                }
             }
+            for (int i = 0; i < lineCount; i++) free(lines[i]);
         }
         if (!g_LogFile)
             g_LogFile = _wfopen(LOG_FILE, L"a, ccs=UNICODE");
+        g_State.logFile = g_LogFile;
     }
     LeaveCriticalSection(&g_LogCs);
 }

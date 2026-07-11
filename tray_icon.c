@@ -10,6 +10,8 @@ void CreateTrayIcon(HWND hwnd)
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
     nid.hIcon = LoadIconW(GetModuleHandleW(NULL), L"APP_ICON");
+    if (!nid.hIcon)
+        nid.hIcon = LoadIconW(NULL, IDI_APPLICATION);
     wcscpy_s(nid.szTip, _countof(nid.szTip), L"Stasis");
     Shell_NotifyIconW(NIM_ADD, &nid);
 }

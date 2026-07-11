@@ -64,7 +64,14 @@ BOOL EnumProcessesEx(DWORD* pids, int maxCount, int* outCount)
 {
     DWORD cbNeeded;
     if (!EnumProcesses(pids, maxCount * sizeof(DWORD), &cbNeeded))
+    {
+        if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+            *outCount = maxCount;
+            return TRUE;
+        }
         return FALSE;
+    }
     *outCount = cbNeeded / sizeof(DWORD);
     return TRUE;
 }
@@ -103,6 +110,7 @@ BOOL IsProcessInUserWhitelist(const WCHAR* name)
 BOOL IsProcessForeground(DWORD pid)
 {
     HWND hFg = GetForegroundWindow();
+    if (!hFg) return FALSE;
     DWORD fgPid;
     GetWindowThreadProcessId(hFg, &fgPid);
     return (fgPid == pid);

@@ -70,6 +70,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ForceThawAll();
     RemoveTrayIcon();
     CloseLog();
+    // 释放用户白名单内存
+    EnterCriticalSection(&g_State.cs);
+    for (int i = 0; i < g_State.whitelistCount; i++)
+        free(g_State.userWhitelist[i]);
+    free(g_State.userWhitelist);
+    g_State.userWhitelist = NULL;
+    g_State.whitelistCount = 0;
+    LeaveCriticalSection(&g_State.cs);
     DeleteCriticalSection(&g_State.cs);
     CloseHandle(hMutex);
     return 0;

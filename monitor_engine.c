@@ -48,6 +48,7 @@ void FreezeHighCpuProcesses(void)
     int count;
     EnumProcessesEx(pids, 1024, &count);
     ProcCpu* procs = malloc(count * sizeof(ProcCpu));
+    if (!procs) return;
     int valid = 0;
     for (int i = 0; i < count; i++)
     {
@@ -146,7 +147,7 @@ DWORD WINAPI MonitorThread(LPVOID param)
             if (current == lastWatchdogCounter && lastWatchdogCounter != 0)
             {
                 ForceThawAll();
-                MessageBoxW(NULL, L"检测到UI无响应，已强制解冻所有进程！", L"Stasis 看门狗", MB_ICONWARNING);
+                PostMessage(g_State.hMainWnd, WM_WATCHDOG_ALERT, 0, 0);
             }
             lastWatchdogCounter = current;
         }
@@ -165,24 +166,27 @@ DWORD WINAPI MonitorThread(LPVOID param)
         if (hasFrozen)
         {
             HWND hFg = GetForegroundWindow();
-            DWORD fgPid;
-            GetWindowThreadProcessId(hFg, &fgPid);
-            EnterCriticalSection(&g_State.cs);
-            for (int i = 0; i < g_State.frozenCount; i++)
+            if (hFg)
             {
-                if (g_State.frozenStack[i] == fgPid)
+                DWORD fgPid;
+                GetWindowThreadProcessId(hFg, &fgPid);
+                EnterCriticalSection(&g_State.cs);
+                for (int i = 0; i < g_State.frozenCount; i++)
                 {
-                    DWORD wakePid = fgPid;
-                    memmove(&g_State.frozenStack[i], &g_State.frozenStack[i+1],
-                        (g_State.frozenCount - i - 1) * sizeof(DWORD));
-                    g_State.frozenCount--;
-                    LeaveCriticalSection(&g_State.cs);
-                    ResumeProcessByPid(wakePid);
-                    EnterCriticalSection(&g_State.cs);
-                    break;
+                    if (g_State.frozenStack[i] == fgPid)
+                    {
+                        DWORD wakePid = fgPid;
+                        memmove(&g_State.frozenStack[i], &g_State.frozenStack[i+1],
+                            (g_State.frozenCount - i - 1) * sizeof(DWORD));
+                        g_State.frozenCount--;
+                        LeaveCriticalSection(&g_State.cs);
+                        ResumeProcessByPid(wakePid);
+                        EnterCriticalSection(&g_State.cs);
+                        break;
+                    }
                 }
+                LeaveCriticalSection(&g_State.cs);
             }
-            LeaveCriticalSection(&g_State.cs);
         }
 
         Sleep(MONITOR_INTERVAL);

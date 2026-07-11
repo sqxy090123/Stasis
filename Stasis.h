@@ -27,6 +27,7 @@
 #define IDC_TITLEBAR_TITLE  1012
 #define WM_TRAYICON         (WM_APP + 1)
 #define WM_WATCHDOG_TIMER   (WM_APP + 2)
+#define WM_WATCHDOG_ALERT   (WM_APP + 3)
 #define ID_TRAY_SHOW        2001
 #define ID_TRAY_PAUSE       2002
 #define ID_TRAY_EXIT        2003
