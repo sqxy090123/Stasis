@@ -179,6 +179,19 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         SetWindowSubclass(GetDlgItem(hwnd, IDC_SLIDER_MEM), SliderSubclassProc, IDC_SLIDER_MEM, 0);
         SetWindowSubclass(GetDlgItem(hwnd, IDC_SLIDER_THAW), SliderSubclassProc, IDC_SLIDER_THAW, 0);
 
+        // 给所有自绘按钮设置字体
+        HWND btns[] = {
+            GetDlgItem(hwnd, IDC_TOGGLE_AUTO),
+            GetDlgItem(hwnd, IDC_SLIDER_CPU),
+            GetDlgItem(hwnd, IDC_SLIDER_MEM),
+            GetDlgItem(hwnd, IDC_SLIDER_THAW),
+            GetDlgItem(hwnd, IDC_BTN_WHITELIST),
+            GetDlgItem(hwnd, IDC_BTN_TRAY),
+            GetDlgItem(hwnd, IDC_BTN_OPTIONS)
+        };
+        for (int i = 0; i < 7; i++)
+            if (btns[i]) SendMessage(btns[i], WM_SETFONT, (WPARAM)g_hBtnFont, TRUE);
+
         CreateTrayIcon(hwnd);
         ApplySettingsToUI();
         SetTimer(hwnd, 500, 1000, NULL);  // 刷新定时器
@@ -295,14 +308,74 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         break;
     case WM_LBUTTONUP:
         if (dragging) { ReleaseCapture(); dragging = FALSE; }
+        else {
+            // 检查标题栏按钮点击
+            POINT pt = { LOWORD(lParam), HIWORD(lParam) };
+            if (pt.y < (int)(35*g_dpiScale)) {
+                RECT rcMin = { (int)(700*g_dpiScale)-70,0, (int)(700*g_dpiScale)-40, (int)(35*g_dpiScale) };
+                RECT rcClose = { (int)(700*g_dpiScale)-35,0, (int)(700*g_dpiScale), (int)(35*g_dpiScale) };
+                if (PtInRect(&rcMin, pt)) {
+                    // 最小化到托盘
+                    ShowWindow(hwnd, SW_HIDE);
+                    g_State.trayVisible = TRUE;
+                    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+                    UpdateTrayIcon(g_State.frozenCount);
+                }
+                else if (PtInRect(&rcClose, pt)) {
+                    // 关闭到托盘（同最小化）
+                    ShowWindow(hwnd, SW_HIDE);
+                    g_State.trayVisible = TRUE;
+                    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+                    UpdateTrayIcon(g_State.frozenCount);
+                    NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW), hwnd, 1, NIF_INFO };
+                    wcscpy_s(nid.szInfo, _countof(nid.szInfo), L"Stasis 已驻留后台");
+                    Shell_NotifyIconW(NIM_MODIFY, &nid);
+                }
+            }
+        }
         break;
+    case WM_DRAWITEM: {
+        LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
+        if (!dis) break;
+        int id = GetDlgCtrlID(dis->hwndItem);
+        BOOL pressed = (dis->itemState & ODS_SELECTED) != 0;
+        BOOL hover = (dis->itemState & ODS_HOTLIGHT) != 0;
+        if (id == IDC_TOGGLE_AUTO) {
+            BOOL state = g_State.autoMode;
+            DrawToggleSwitch(dis->hDC, dis->rcItem, state);
+        }
+        else if (id == IDC_SLIDER_CPU || id == IDC_SLIDER_MEM || id == IDC_SLIDER_THAW) {
+            int min = 0, max = 100, *pVal = NULL;
+            if (id == IDC_SLIDER_CPU) { min = 50; max = 100; pVal = &g_State.cpuThreshold; }
+            else if (id == IDC_SLIDER_MEM) { min = 50; max = 100; pVal = &g_State.memThreshold; }
+            else if (id == IDC_SLIDER_THAW) { min = 30; max = 80; pVal = &g_State.thawThreshold; }
+            if (pVal) DrawSlider(dis->hDC, dis->rcItem, min, max, *pVal);
+        }
+        else if (id == IDC_BTN_WHITELIST || id == IDC_BTN_TRAY || id == IDC_BTN_OPTIONS) {
+            WCHAR text[32] = {0};
+            GetWindowTextW(dis->hwndItem, text, 32);
+            DrawRoundedButton(dis->hDC, dis->rcItem, text, hover, pressed);
+        }
+        break;
+    }
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
+        case IDC_TOGGLE_AUTO:
+            g_State.autoMode = !g_State.autoMode;
+            InvalidateRect(GetDlgItem(hwnd, IDC_TOGGLE_AUTO), NULL, TRUE);
+            SaveSettings();
+            break;
+        case IDC_BTN_WHITELIST:
+            MessageBoxW(hwnd, L"白名单功能待实现", L"提示", MB_ICONINFORMATION);
+            break;
         case IDC_BTN_TRAY:
             ShowWindow(hwnd, SW_HIDE);
             g_State.trayVisible = TRUE;
             SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
             UpdateTrayIcon(g_State.frozenCount);
+            break;
+        case IDC_BTN_OPTIONS:
+            MessageBoxW(hwnd, L"选项功能待实现", L"提示", MB_ICONINFORMATION);
             break;
         case IDC_SYSLINK_FEEDBACK:
             ShellExecuteW(NULL, L"open", L"https://github.com/sqxy090123/Stasis/issues", NULL, NULL, SW_SHOWNORMAL);
