@@ -9,15 +9,33 @@ on:
   release:
     types: [published]
 
+env:
+  BUILD_VERSION: ${{ github.run_number }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   build:
     runs-on: windows-latest
     permissions:
       contents: write
+      packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from git
+        id: version
+        run: |
+          if ("${{ github.ref }}" -match "refs/tags/v(.+)") {
+            $version = $matches[1]
+          } else {
+            $commit = (git rev-parse --short HEAD)
+            $version = "dev-$commit"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: Setup MSVC and build
         shell: cmd
@@ -45,13 +63,20 @@ jobs:
           where cl || echo cl not found on PATH
           cl /? >nul 2>&1 || echo cl failed to run (check vcvarsall)
 
-          REM run your build
-          build.bat
+          REM run your build with version from git
+          build.bat %VERSION%
+
+      - name: Static analysis (MSVC /analyze)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cl /analyze /W4 /c *.c 2>&1 | findstr /V /C:"note" /C:"warning" || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Stasis.exe
+          name: Stasis-${{ steps.version.outputs.VERSION }}-x64
           path: Stasis.exe
           retention-days: 30
 
@@ -61,3 +86,34 @@ jobs:
         with:
           files: Stasis.exe
           generate_release_notes: true
+          name: Stasis v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Stasis v${{ steps.version.outputs.VERSION }}
+
+            ### Changes
+            ${{ github.event.release.body || 'See commit history for changes.' }}
+
+            ### Download
+            - [Stasis.exe](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/Stasis.exe)
+
+            ### Build Info
+            - Commit: ${{ github.sha }}
+            - Built on: ${{ github.run_id }}
+            - Platform: Windows x64
+
+      - name: Create prerelease artifact (on push to main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p prerelease
+          copy Stasis.exe prerelease\Stasis-${{ steps.version.outputs.VERSION }}-x64.exe
+          echo "Built Stasis-${{ steps.version.outputs.VERSION }}-x64.exe" > prerelease\build-info.txt
+          echo "Commit: ${{ github.sha }}" >> prerelease\build-info.txt
+          echo "Date: $(date)" >> prerelease\build-info.txt
+
+      - name: Upload prerelease artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stasis-prerelease-${{ steps.version.outputs.VERSION }}
+          path: prerelease/
+          retention-days: 7
