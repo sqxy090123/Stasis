@@ -66,6 +66,13 @@ jobs:
           REM run your build with version from git
           build.bat ${{ steps.version.outputs.VERSION }}
 
+      - name: Debug - list files after build
+        shell: cmd
+        run: |
+          dir /b
+          echo ===
+          if exist Stasis.exe (echo Stasis.exe EXISTS) else (echo Stasis.exe NOT FOUND)
+
       - name: Static analysis (MSVC /analyze)
         if: runner.os == 'Windows'
         shell: cmd
