@@ -64,12 +64,23 @@ jobs:
           cl /? >nul 2>&1 || echo cl failed to run (check vcvarsall)
 
           REM run your build with version from git
-          build.bat %VERSION%
+          build.bat ${{ steps.version.outputs.VERSION }}
 
       - name: Static analysis (MSVC /analyze)
         if: runner.os == 'Windows'
         shell: cmd
         run: |
+          REM locate the latest VS installation that has the VC tools
+          set "VSW=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+          if not exist "%VSW%" (
+            echo vswhere not found at "%VSW%"
+            exit /b 1
+          )
+          for /f "delims=" %%I in ('"%VSW%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set "VSINSTALL=%%I"
+          if "%VSINSTALL%"=="" (
+            echo No Visual Studio with VC tools found
+            exit /b 1
+          )
           call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
           cl /analyze /W4 /c *.c 2>&1 | findstr /V /C:"note" /C:"warning" || true
 
