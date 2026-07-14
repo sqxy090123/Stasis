@@ -39,12 +39,36 @@ BOOL EnableDebugPrivilege(void)
     return ret;
 }
 
+DWORD WINAPI SuspendThreadWrapper(LPVOID param)
+{
+    HANDLE hProcess = (HANDLE)param;
+    return NtSuspendProcess(hProcess);
+}
+
+DWORD WINAPI ResumeThreadWrapper(LPVOID param)
+{
+    HANDLE hProcess = (HANDLE)param;
+    return NtResumeProcess(hProcess);
+}
+
 BOOL SuspendProcessByPid(DWORD pid)
 {
-    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME | SYNCHRONIZE, FALSE, pid);
     if (!hProcess) return FALSE;
-    // 简单同步调用，无超时保护（可扩展）
-    BOOL ret = NtSuspendProcess(hProcess);
+    HANDLE hThread = CreateThread(NULL, 0, SuspendThreadWrapper, hProcess, 0, NULL);
+    if (!hThread) {
+        CloseHandle(hProcess);
+        return FALSE;
+    }
+    DWORD wait = WaitForSingleObject(hThread, SUSPEND_TIMEOUT_MS);
+    DWORD ret = FALSE;
+    if (wait == WAIT_OBJECT_0) {
+        GetExitCodeThread(hThread, &ret);
+    } else {
+        TerminateThread(hThread, 0);
+        ret = FALSE;
+    }
+    CloseHandle(hThread);
     CloseHandle(hProcess);
     if (ret) LogEvent(L"Frozen PID %lu", pid);
     return ret;
@@ -52,9 +76,22 @@ BOOL SuspendProcessByPid(DWORD pid)
 
 BOOL ResumeProcessByPid(DWORD pid)
 {
-    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME | SYNCHRONIZE, FALSE, pid);
     if (!hProcess) return FALSE;
-    BOOL ret = NtResumeProcess(hProcess);
+    HANDLE hThread = CreateThread(NULL, 0, ResumeThreadWrapper, hProcess, 0, NULL);
+    if (!hThread) {
+        CloseHandle(hProcess);
+        return FALSE;
+    }
+    DWORD wait = WaitForSingleObject(hThread, SUSPEND_TIMEOUT_MS);
+    DWORD ret = FALSE;
+    if (wait == WAIT_OBJECT_0) {
+        GetExitCodeThread(hThread, &ret);
+    } else {
+        TerminateThread(hThread, 0);
+        ret = FALSE;
+    }
+    CloseHandle(hThread);
     CloseHandle(hProcess);
     if (ret) LogEvent(L"Resumed PID %lu", pid);
     return ret;
@@ -68,11 +105,13 @@ BOOL EnumProcessesEx(DWORD* pids, int maxCount, int* outCount)
         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
             *outCount = maxCount;
+            g_State.enumTruncated = TRUE;
             return TRUE;
         }
         return FALSE;
     }
     *outCount = cbNeeded / sizeof(DWORD);
+    g_State.enumTruncated = FALSE;
     return TRUE;
 }
 
@@ -91,7 +130,7 @@ BOOL IsCriticalProcess(const WCHAR* name)
 {
     for (int i = 0; i < SYSTEM_WHITELIST_COUNT; i++)
         if (_wcsicmp(name, SystemWhitelist[i]) == 0) return TRUE;
-    return FALSE; // 注意：用户白名单在逻辑上应单独判断，此处仅检查系统关键进程
+    return FALSE;
 }
 
 BOOL IsProcessInUserWhitelist(const WCHAR* name)

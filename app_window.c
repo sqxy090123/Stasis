@@ -385,6 +385,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_WATCHDOG_ALERT:
         MessageBoxW(hwnd, L"检测到UI无响应，已强制解冻所有进程！", L"Stasis 看门狗", MB_ICONWARNING);
         break;
+    case WM_USER + 1:
+        RefreshListView();
+        break;
     case WM_TRAYICON:
         if (lParam == WM_RBUTTONUP) ShowTrayMenu(hwnd);
         else if (lParam == WM_LBUTTONDBLCLK) {

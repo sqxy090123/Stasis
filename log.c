@@ -1,6 +1,8 @@
 #include "Stasis.h"
 
 #define LOG_FILE L"Stasis.log"
+#define LOG_MAX_LINES 500
+#define LOG_MAX_SIZE (50 * 1024)
 
 static FILE* g_LogFile = NULL;
 static CRITICAL_SECTION g_LogCs;
@@ -16,13 +18,68 @@ void InitLog(void)
 
 void CloseLog(void)
 {
+    EnterCriticalSection(&g_LogCs);
     if (g_LogFile)
     {
         fwprintf(g_LogFile, L"=== Stasis Log Closed ===\n");
         fclose(g_LogFile);
         g_LogFile = NULL;
     }
+    g_State.logFile = NULL;
+    LeaveCriticalSection(&g_LogCs);
     DeleteCriticalSection(&g_LogCs);
+}
+
+static void RotateLogIfNeeded(void)
+{
+    if (!g_LogFile) return;
+    fseek(g_LogFile, 0, SEEK_END);
+    long size = ftell(g_LogFile);
+    if (size <= LOG_MAX_SIZE) return;
+
+    fclose(g_LogFile);
+    FILE* fSrc = _wfopen(LOG_FILE, L"r, ccs=UNICODE");
+    if (!fSrc) {
+        g_LogFile = _wfopen(LOG_FILE, L"a, ccs=UNICODE");
+        return;
+    }
+
+    WCHAR** lines = malloc(1000 * sizeof(WCHAR*));
+    if (!lines) {
+        fclose(fSrc);
+        g_LogFile = _wfopen(LOG_FILE, L"a, ccs=UNICODE");
+        return;
+    }
+
+    int lineCount = 0;
+    WCHAR buf[512];
+    BOOL allocFailed = FALSE;
+    while (fgetws(buf, 512, fSrc) && lineCount < 1000)
+    {
+        size_t len = wcslen(buf);
+        lines[lineCount] = malloc((len + 1) * sizeof(WCHAR));
+        if (!lines[lineCount]) { allocFailed = TRUE; break; }
+        wcscpy_s(lines[lineCount], len + 1, buf);
+        lineCount++;
+    }
+    fclose(fSrc);
+
+    if (!allocFailed)
+    {
+        g_LogFile = _wfopen(LOG_FILE, L"w, ccs=UNICODE");
+        if (g_LogFile)
+        {
+            int start = lineCount > LOG_MAX_LINES ? lineCount - LOG_MAX_LINES : 0;
+            for (int i = start; i < lineCount; i++)
+                fputws(lines[i], g_LogFile);
+        }
+    }
+    for (int i = 0; i < lineCount; i++) free(lines[i]);
+    free(lines);
+
+    if (!g_LogFile)
+        g_LogFile = _wfopen(LOG_FILE, L"a, ccs=UNICODE");
+    g_State.logFile = g_LogFile;
 }
 
 void LogEvent(const WCHAR* format, ...)
@@ -47,51 +104,10 @@ void LogEvent(const WCHAR* format, ...)
     fwprintf(g_LogFile, L"\n");
     fflush(g_LogFile);
 
-    // 简单截断：若文件过大则重新截取最后500行
-    fseek(g_LogFile, 0, SEEK_END);
-    long size = ftell(g_LogFile);
-    if (size > 50 * 1024)
-    {
-        fclose(g_LogFile);
-        FILE* fSrc = _wfopen(LOG_FILE, L"r, ccs=UNICODE");
-        if (fSrc)
-        {
-            WCHAR* lines[1000] = {0};
-            int lineCount = 0;
-            WCHAR buf[512];
-            BOOL allocFailed = FALSE;
-            while (fgetws(buf, 512, fSrc) && lineCount < 1000)
-            {
-                size_t len = wcslen(buf);
-                lines[lineCount] = (WCHAR*)malloc((len + 1) * sizeof(WCHAR));
-                if (!lines[lineCount])
-                {
-                    allocFailed = TRUE;
-                    break;
-                }
-                wcscpy_s(lines[lineCount], len + 1, buf);
-                lineCount++;
-            }
-            fclose(fSrc);
-
-            if (!allocFailed)
-            {
-                g_LogFile = _wfopen(LOG_FILE, L"w, ccs=UNICODE");
-                if (g_LogFile)
-                {
-                    int start = lineCount > LOG_MAX_LINES ? lineCount - LOG_MAX_LINES : 0;
-                    for (int i = start; i < lineCount; i++)
-                        fputws(lines[i], g_LogFile);
-                }
-            }
-            for (int i = 0; i < lineCount; i++) free(lines[i]);
-        }
-        if (!g_LogFile)
-            g_LogFile = _wfopen(LOG_FILE, L"a, ccs=UNICODE");
-        g_State.logFile = g_LogFile;
-    }
+    RotateLogIfNeeded();
     LeaveCriticalSection(&g_LogCs);
 }
+
 void DebugLog(const WCHAR* format, ...)
 {
     if (!g_DebugMode) return;

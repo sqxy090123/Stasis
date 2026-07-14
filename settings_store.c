@@ -11,12 +11,10 @@ void LoadSettings(void)
     g_State.thawThreshold = GetPrivateProfileIntW(L"Settings", L"ThawThreshold", DEFAULT_THAW_THRESHOLD, CONFIG_FILE);
     g_State.autoMode = GetPrivateProfileIntW(L"Settings", L"AutoMode", 1, CONFIG_FILE);
 
-    // 加载用户白名单
     WCHAR buf[2048] = {0};
     GetPrivateProfileStringW(L"Settings", L"Whitelist", L"", buf, 2048, CONFIG_FILE);
     if (wcslen(buf) > 0)
     {
-        // 简单以分号分隔
         WCHAR* context = NULL;
         WCHAR* token = wcstok_s(buf, L";", &context);
         while (token)
@@ -60,17 +58,25 @@ void SaveSettings(void)
     swprintf_s(buf, 16, L"%d", g_State.autoMode);
     WritePrivateProfileStringW(L"Settings", L"AutoMode", buf, CONFIG_FILE);
 
-    // 保存白名单
-    WCHAR whitelistStr[2048] = {0};
+    size_t totalLen = 1;
     EnterCriticalSection(&g_State.cs);
     for (int i = 0; i < g_State.whitelistCount; i++)
-    {
-        wcscat_s(whitelistStr, 2048, g_State.userWhitelist[i]);
-        if (i < g_State.whitelistCount - 1)
-            wcscat_s(whitelistStr, 2048, L";");
+        totalLen += wcslen(g_State.userWhitelist[i]) + 1;
+    WCHAR* whitelistStr = malloc(totalLen * sizeof(WCHAR));
+    if (whitelistStr) {
+        whitelistStr[0] = L'\0';
+        for (int i = 0; i < g_State.whitelistCount; i++)
+        {
+            wcscat_s(whitelistStr, totalLen, g_State.userWhitelist[i]);
+            if (i < g_State.whitelistCount - 1)
+                wcscat_s(whitelistStr, totalLen, L";");
+        }
     }
     LeaveCriticalSection(&g_State.cs);
-    WritePrivateProfileStringW(L"Settings", L"Whitelist", whitelistStr, CONFIG_FILE);
+    if (whitelistStr) {
+        WritePrivateProfileStringW(L"Settings", L"Whitelist", whitelistStr, CONFIG_FILE);
+        free(whitelistStr);
+    }
 }
 
 BOOL SetAutoStart(BOOL enable)
@@ -81,7 +87,10 @@ BOOL SetAutoStart(BOOL enable)
     if (enable)
     {
         WCHAR path[MAX_PATH];
-        GetModuleFileNameW(NULL, path, MAX_PATH);
+        if (GetModuleFileNameW(NULL, path, MAX_PATH) == 0) {
+            RegCloseKey(hKey);
+            return FALSE;
+        }
         RegSetValueExW(hKey, REG_VAL, 0, REG_SZ, (BYTE*)path, (DWORD)(wcslen(path)+1)*sizeof(WCHAR));
     }
     else

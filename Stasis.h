@@ -84,6 +84,8 @@ typedef struct {
     FILE* logFile;
     // 亚克力注册键
     BOOL acrylicEnabled;
+    // EnumProcesses 截断标记
+    BOOL enumTruncated;
 } AppState;
 
 // 全局状态 extern 声明（定义在 app_window.c）

@@ -1,6 +1,41 @@
 // monitor_engine.c - 监控线程及调度算法
 #include "Stasis.h"
 
+typedef struct {
+    DWORD pid;
+    ULONGLONG lastKernel;
+    ULONGLONG lastUser;
+    double cpu;
+} ProcCpu;
+
+static int CompareProcCpu(const void* a, const void* b)
+{
+    double diff = ((ProcCpu*)b)->cpu - ((ProcCpu*)a)->cpu;
+    return (diff > 0) ? 1 : (diff < 0) ? -1 : 0;
+}
+
+static ULONGLONG GetProcessTotalCpuTime(DWORD pid)
+{
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!hProcess) return 0;
+    FILETIME create, exit, kernel, user;
+    BOOL ok = GetProcessTimes(hProcess, &create, &exit, &kernel, &user);
+    CloseHandle(hProcess);
+    if (!ok) return 0;
+    ULONGLONG kernelTime = ((ULONGLONG)kernel.dwHighDateTime << 32) | kernel.dwLowDateTime;
+    ULONGLONG userTime = ((ULONGLONG)user.dwHighDateTime << 32) | user.dwLowDateTime;
+    return kernelTime + userTime;
+}
+
+static ULONGLONG GetSystemTotalCpuTime(void)
+{
+    FILETIME idle, kernel, user;
+    GetSystemTimes(&idle, &kernel, &user);
+    ULONGLONG kernelTime = ((ULONGLONG)kernel.dwHighDateTime << 32) | kernel.dwLowDateTime;
+    ULONGLONG userTime = ((ULONGLONG)user.dwHighDateTime << 32) | user.dwLowDateTime;
+    return kernelTime + userTime;
+}
+
 double GetTotalCpuUsage(void)
 {
     static ULONGLONG prevIdle = 0, prevKernel = 0, prevUser = 0;
@@ -26,17 +61,6 @@ double GetTotalMemUsage(void)
     return (double)mem.dwMemoryLoad;
 }
 
-typedef struct {
-    DWORD pid;
-    double cpu;
-} ProcCpu;
-
-static int CompareProcCpu(const void* a, const void* b)
-{
-    double diff = ((ProcCpu*)b)->cpu - ((ProcCpu*)a)->cpu;
-    return (diff > 0) ? 1 : (diff < 0) ? -1 : 0;
-}
-
 void FreezeHighCpuProcesses(void)
 {
     DebugLog(L"FreezeHighCpuProcesses called");
@@ -50,6 +74,7 @@ void FreezeHighCpuProcesses(void)
     ProcCpu* procs = malloc(count * sizeof(ProcCpu));
     if (!procs) return;
     int valid = 0;
+
     for (int i = 0; i < count; i++)
     {
         DWORD pid = pids[i];
@@ -74,10 +99,28 @@ void FreezeHighCpuProcesses(void)
         if (IsProcessInUserWhitelist(name)) continue;
         if (IsCurrentProcess(pid)) continue;
 
+        ULONGLONG procTime = GetProcessTotalCpuTime(pid);
+        if (procTime == 0) continue;
+
         procs[valid].pid = pid;
-        procs[valid].cpu = 5.0; // 简化占位
+        procs[valid].lastKernel = procTime;
+        procs[valid].lastUser = 0;
+        procs[valid].cpu = 0.0;
         valid++;
     }
+
+    ULONGLONG sysTotal1 = GetSystemTotalCpuTime();
+    Sleep(200);
+    ULONGLONG sysTotal2 = GetSystemTotalCpuTime();
+    ULONGLONG sysTotalDiff = sysTotal2 - sysTotal1;
+
+    for (int i = 0; i < valid; i++)
+    {
+        ULONGLONG procTime2 = GetProcessTotalCpuTime(procs[i].pid);
+        ULONGLONG procDiff = procTime2 - procs[i].lastKernel;
+        procs[i].cpu = (sysTotalDiff > 0) ? (double)procDiff / sysTotalDiff * 100.0 : 0.0;
+    }
+
     qsort(procs, valid, sizeof(ProcCpu), CompareProcCpu);
 
     int maxFreezeThisRound = 5;
@@ -122,6 +165,7 @@ void ThawProcessesIfNeeded(void)
 
 void ForceThawAll(void)
 {
+    LogEvent(L"Watchdog/Exit: ForceThawAll, frozen=%d", g_State.frozenCount);
     EnterCriticalSection(&g_State.cs);
     while (g_State.frozenCount > 0)
     {
@@ -136,10 +180,10 @@ void ForceThawAll(void)
 DWORD WINAPI MonitorThread(LPVOID param)
 {
     LONG lastWatchdogCounter = 0;
-    DWORD lastCheck = 0;
+    ULONGLONG lastCheck = 0;
     while (g_State.monitorRunning)
     {
-        DWORD now = GetTickCount();
+        ULONGLONG now = GetTickCount64();
         if (now - lastCheck > 2000)
         {
             lastCheck = now;
